@@ -5,7 +5,7 @@ Build as a proof concept, for future works in my homelab. Not intended for major
 
 ## Project Structure
 
-
+```
 mtg-app-project/
 ├── frontend/                     # Static HTML/CSS/JS frontend (served by Nginx)
 ├── card_catalog_service/         # Python Flask backend API
@@ -14,7 +14,7 @@ mtg-app-project/
 ├── requirements.txt              # Python dependencies for the backend
 ├── mongodb_custom_image/         # Custom MongoDB image assets (includes pre-loaded data)
 └── docker-compose.yml            # Docker Compose orchestration file
-
+```
 
 ## Core Components
 
