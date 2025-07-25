@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Card Search</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for Inter font */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+        }
+        .card-result {
+            transition: transform 0.2s ease-in-out;
+        }
+        .card-result:hover {
+            transform: translateY(-5px);
+        }
+        /* Placeholder for image loading */
+        .card-image-placeholder {
+            background-color: #2d3748; /* Darker gray background */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0aec0;
+            font-size: 0.875rem; /* text-sm */
+            border-radius: 0.5rem; /* rounded-lg */
+            height: 200px; /* Fixed height for consistency */
+            width: 100%; /* Full width within parent */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4">
+    <div class="container mx-auto max-w-2xl bg-gray-800 p-8 rounded-xl shadow-lg">
+        <h1 class="text-4xl font-bold text-center mb-8 text-indigo-400">MTG Card Search</h1>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-8">
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search for a card (e.g., Lightning Bolt)"
+                class="flex-grow p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onkeydown="if(event.key === 'Enter') searchCards()"
+            />
+            <button
+                id="searchButton"
+                onclick="searchCards()"
+                class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition ease-in-out duration-150"
+            >
+                Search
+            </button>
+        </div>
+
+        <div id="loadingIndicator" class="hidden text-center text-indigo-300 text-lg mb-4">
+            Loading cards...
+        </div>
+
+        <div id="resultsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Card results will be injected here by JavaScript -->
+        </div>
+
+        <div id="messageBox" class="hidden mt-8 p-4 bg-yellow-600 text-white rounded-lg shadow-md text-center">
+            <!-- Messages will appear here -->
+        </div>
+    </div>
+
+    <script>
+        // Base URL for your Card Catalog Service
+        const API_BASE_URL = 'http://localhost:5000'; 
+
+        /**
+         * Displays a message in the message box.
+         * @param {string} message The message to display.
+         * @param {string} type The type of message (e.g., 'info', 'error', 'warning').
+         */
+        function showMessageBox(message, type = 'info') {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.className = 'mt-8 p-4 rounded-lg shadow-md text-center'; // Reset classes
+            messageBox.classList.remove('hidden');
+
+            // Apply type-specific styling
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-600', 'text-white');
+            } else if (type === 'warning') {
+                messageBox.classList.add('bg-yellow-600', 'text-white');
+            } else {
+                messageBox.classList.add('bg-blue-600', 'text-white');
+            }
+
+            // Hide after a few seconds
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        /**
+         * Fetches cards from the backend API based on the search input.
+         */
+        async function searchCards() {
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput.value.trim();
+            const resultsContainer = document.getElementById('resultsContainer');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            resultsContainer.innerHTML = ''; // Clear previous results
+            document.getElementById('messageBox').classList.add('hidden'); // Hide any previous messages
+
+            if (!query) {
+                showMessageBox('Please enter a card name to search.', 'warning');
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden'); // Show loading indicator
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/cards?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.length > 0) {
+                        data.forEach(card => {
+                            const cardElement = createCardElement(card);
+                            resultsContainer.appendChild(cardElement);
+                        });
+                    } else {
+                        showMessageBox('No cards found matching your query.', 'info');
+                    }
+                } else {
+                    // Handle API errors (e.g., 400, 500 from your Flask app)
+                    showMessageBox(`Error: ${data.error || data.message || 'Unknown error from server.'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching cards:', error);
+                showMessageBox('Could not connect to the backend service. Please ensure it is running.', 'error');
+            } finally {
+                loadingIndicator.classList.add('hidden'); // Hide loading indicator
+            }
+        }
+
+        /**
+         * Creates an HTML element for a single card result.
+         * @param {object} card The card data object.
+         * @returns {HTMLElement} The created card element.
+         */
+        function createCardElement(card) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card-result bg-gray-700 p-4 rounded-lg shadow-md flex flex-col items-center text-center';
+
+            // Card Image
+            if (card.image_url) {
+                const img = document.createElement('img');
+                img.src = card.image_url;
+                img.alt = card.name || 'Magic Card';
+                img.className = 'w-full h-auto rounded-lg mb-3 shadow-md';
+                // Fallback for broken images
+                img.onerror = function() {
+                    this.onerror=null; // Prevent infinite loop
+                    this.src='https://placehold.co/223x310/2d3748/a0aec0?text=Image+Not+Available'; // Placeholder
+                    this.classList.add('card-image-placeholder'); // Add placeholder styling
+                    this.style.width = '100%'; // Ensure placeholder fills
+                    this.style.height = 'auto'; // Ensure placeholder fills
+                };
+                cardDiv.appendChild(img);
+            } else {
+                // Placeholder if no image_url is provided
+                const placeholder = document.createElement('div');
+                placeholder.className = 'card-image-placeholder mb-3';
+                placeholder.textContent = 'No Image';
+                cardDiv.appendChild(placeholder);
+            }
+
+            // Card Name
+            const name = document.createElement('h2');
+            name.className = 'text-xl font-semibold text-white mb-1';
+            name.textContent = card.name || 'Unknown Card';
+            cardDiv.appendChild(name);
+
+            // Set Code and Rarity
+            if (card.set_code || card.rarity) {
+                const details = document.createElement('p');
+                details.className = 'text-sm text-gray-400';
+                details.textContent = `${card.set_code ? card.set_code : ''}${card.set_code && card.rarity ? ' - ' : ''}${card.rarity ? card.rarity : ''}`;
+                cardDiv.appendChild(details);
+            }
+
+            // Oracle Text (optional, can be expanded for full details)
+            if (card.oracle_text) {
+                const oracleText = document.createElement('p');
+                oracleText.className = 'text-xs text-gray-500 mt-2';
+                oracleText.textContent = card.oracle_text.length > 100 ? card.oracle_text.substring(0, 97) + '...' : card.oracle_text;
+                cardDiv.appendChild(oracleText);
+            }
+
+            return cardDiv;
+        }
+
+        /**
+         * Checks the backend health with retries.
+         * @param {number} attempt Current retry attempt.
+         * @param {number} maxAttempts Maximum number of retry attempts.
+         * @param {number} delayMs Initial delay in milliseconds.
+         */
+        async function checkBackendHealth(attempt = 1, maxAttempts = 10, delayMs = 500) { // Increased maxAttempts and delayMs
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (!response.ok) {
+                    // Backend responded but with an error status (e.g., 500 from health check logic)
+                    const errorData = await response.json();
+                    showMessageBox(`Backend health check failed (Status: ${response.status}): ${errorData.database_connection || 'Unknown error'}`, 'warning');
+                } else {
+                    // Backend is healthy
+                    showMessageBox('Backend service is connected and healthy!', 'info');
+                }
+            } catch (error) {
+                // Network error (connection refused, timeout, etc.)
+                console.warn(`Backend health check attempt ${attempt} failed: ${error.message}`);
+                if (attempt < maxAttempts) {
+                    const nextDelay = delayMs * Math.pow(1.5, attempt - 1); // Slightly less aggressive exponential backoff
+                    showMessageBox(`Attempting to connect to backend... (Retry ${attempt}/${maxAttempts}, next in ${Math.round(nextDelay)}ms)`, 'info');
+                    setTimeout(() => checkBackendHealth(attempt + 1, maxAttempts, delayMs), nextDelay);
+                } else {
+                    showMessageBox('Could not connect to the backend service. Please ensure your Flask app is running.', 'error');
+                    console.error('Final attempt to connect to backend failed.', error);
+                }
+            }
+        }
+
+        // Initial check for API connectivity when the page loads
+        window.onload = () => {
+            checkBackendHealth();
+        };
+    </script>
+</body>
+</html>

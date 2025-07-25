@@ -1,0 +1,68 @@
+# docker-compose.yml
+services:
+  # --- MongoDB Service ---
+  mongodb:
+    build:
+      context: ./mongodb_custom_image # Build context for the custom MongoDB image
+      dockerfile: Dockerfile # Use Dockerfile inside mongodb_custom_image directory
+    container_name: mtg-mongodb # A friendly name for the container
+    ports:
+      - "27017:27017" # Map host port 27017 to container port 27017 (optional for backend, but useful for mongosh from host)
+    volumes:
+      - mongodb_data:/data/db # Persist MongoDB data to a named volume
+    environment:
+      # Optional: Set MongoDB environment variables for authentication if you enable it
+      # MONGO_INITDB_ROOT_USERNAME: your_admin_username
+      # MONGO_INITDB_ROOT_PASSWORD: your_admin_password
+      # For now, we assume authentication is handled by your app's config.py
+      # and a user created via ingestion script or mongosh.
+      - MONGO_URI=mongodb://mongodb:27017 # Example URI for internal use if needed
+    networks:
+      - mtg_app_network # Connect to our custom network
+
+  # --- Card Catalog Service (Flask Backend) ---
+  card-catalog-service:
+    build:
+      context: . # Build context is the current directory (mtg-app-project root)
+      dockerfile: Dockerfile.backend # Use the Dockerfile we created
+    container_name: mtg-card-catalog # A friendly name for the container
+    ports:
+      - "5000:5000" # Map host port 5000 to container port 5000 (allows frontend to reach it)
+    #environment:
+      # These environment variables could override values in config.py if needed,
+      # but for now, config.py is sufficient.
+      # FLASK_ENV: production # Set to production for better performance/security in homelab
+    depends_on:
+      - mongodb # Ensures MongoDB starts before the backend service
+    volumes:
+      # Optional: Mount your local code for live reloading during development (useful for backend changes)
+      # This is for development only. For production, you'd rely on COPY in Dockerfile.
+      # - ./card_catalog_service:/app/card_catalog_service
+      - ./card_catalog_service/requirements.txt:/app/card_catalog_service/requirements.txt
+    networks:
+      - mtg_app_network # Connect to our custom network
+
+  # --- Frontend Application (Nginx) ---
+  frontend:
+    build:
+      context: . # Build context is the current directory (mtg-app-project root)
+      dockerfile: Dockerfile.frontend # Use the Dockerfile we created for the frontend
+    container_name: mtg-frontend # A friendly name for the container
+    ports:
+      - "80:80" # Map host port 80 to container port 80 (standard HTTP port)
+      # You could use - "8000:80" if you prefer to keep it on 8000 on your host
+    depends_on:
+      - card-catalog-service # Frontend depends on the backend to be available
+    networks:
+      - mtg_app_network # Connect to our custom network
+
+# --- Docker Volumes ---
+# Define named volumes for persistent data
+volumes:
+  mongodb_data: # This volume will store your MongoDB data
+
+# --- Docker Networks ---
+# Define a custom bridge network for services to communicate securely
+networks:
+  mtg_app_network:
+    driver: bridge
