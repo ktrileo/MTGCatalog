@@ -4,7 +4,8 @@
 # Python ignores
 *.pyc
 __pycache__/
-venv/  # Ignore virtual environments
+venv/  
+# Ignore virtual environments
 
 # Docker ignores
 .dockerignore
@@ -26,5 +27,4 @@ build/
 # Docker specific ignores
 # Ignore Docker volumes if they are created directly in the project root (less common with named volumes)
 # .docker/volumes/
-*.bson
-*.json
+.dump/
